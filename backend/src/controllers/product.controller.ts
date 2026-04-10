@@ -57,7 +57,7 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
 
   const files = (req.files as Express.Multer.File[]) || [];
   const product = await ProductService.updateProduct(
-    id, req.user!.id, req.user!.role, value, files
+    id, req.user!.id, req.user!.role as Role, value, files
   );
   res.json(product);
 };
@@ -66,7 +66,7 @@ export const deleteProduct = async (req: Request, res: Response): Promise<void> 
   const id = parseInt(req.params.id);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid product ID" }); return; }
 
-  const result = await ProductService.deleteProduct(id, req.user!.id, req.user!.role);
+  const result = await ProductService.deleteProduct(id, req.user!.id, req.user!.role as Role);
   res.json(result);
 };
 

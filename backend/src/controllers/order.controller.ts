@@ -28,7 +28,7 @@ export const getMyOrders = async (req: Request, res: Response): Promise<void> =>
 
 export const getOrderById = async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
-  const result = await OrderService.getOrderById(id, req.user!.id, req.user!.role);
+  const result = await OrderService.getOrderById(id, req.user!.id, req.user!.role as Role);
   res.json(result);
 };
 
@@ -38,7 +38,7 @@ export const updateOrderStatus = async (req: Request, res: Response): Promise<vo
   if (error) { res.status(400).json({ message: error.message }); return; }
 
   const result = await OrderService.updateOrderStatus(
-    id, value.status, req.user!.id, req.user!.role
+    id, value.status, req.user!.id, req.user!.role as Role
   );
   res.json(result);
 };

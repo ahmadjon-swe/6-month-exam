@@ -1,0 +1,36 @@
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 28px; padding: 32px 0 64px; align-items: start; }
+
+.sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: calc(var(--nav-height) + 16px); }
+
+.userCard { display: flex; align-items: center; gap: 14px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: var(--text-inverse); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.3rem; flex-shrink: 0; }
+.userName { font-weight: 700; font-size: 0.95rem; margin-bottom: 2px; }
+.userEmail { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px; }
+.roleBadge { font-size: 0.68rem !important; }
+
+.nav { display: flex; flex-direction: column; gap: 4px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 10px; }
+.navBtn {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: var(--radius-md); color: var(--text-secondary); font-size: 0.88rem;
+  font-weight: 500; cursor: pointer; background: none; border: none;
+  font-family: var(--font-main); transition: all 0.15s; text-align: left; width: 100%;
+}
+.navBtn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+.navActive { color: var(--accent) !important; background: var(--accent-glow) !important; }
+
+.upgradeBtn { width: 100%; justify-content: center; }
+
+.content {}
+.sectionTitle { font-size: 1.1rem; font-weight: 700; margin-bottom: 24px; letter-spacing: -0.01em; }
+
+.form { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
+
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fullWidth { grid-column: 1 / -1; }
+
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: static; }
+  .formGrid { grid-template-columns: 1fr; }
+  .fullWidth { grid-column: auto; }
+}
