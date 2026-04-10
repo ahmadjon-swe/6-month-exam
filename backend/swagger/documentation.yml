@@ -1,0 +1,1184 @@
+openapi: 3.0.3
+info:
+  title: ShopHub E-Commerce API
+  description: |
+    Full-featured e-commerce REST API with JWT 2FA authentication, product management,
+    cart, wishlist, and order processing.
+  version: 1.0.0
+  contact:
+    name: ShopHub Team
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development server
+
+tags:
+  - name: Auth
+    description: Registration, login (2FA with OTP), password reset, token refresh
+  - name: Users
+    description: User profile, billing, role management
+  - name: Products
+    description: Product CRUD, search, discounts
+  - name: Cart
+    description: Shopping cart management
+  - name: Wishlist
+    description: Wishlist management
+  - name: Orders
+    description: Order placement and tracking
+
+# ─── Security ─────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          minLength: 6
+          example: secret123
+        role:
+          type: string
+          enum: [user, seller]
+          default: user
+
+    VerifyOtpRequest:
+      type: object
+      required: [email, otp]
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+          example: "482910"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [email, otp, new_password]
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+          example: "193847"
+        new_password:
+          type: string
+          minLength: 6
+
+    AuthTokensResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+            role:
+              type: string
+              enum: [user, seller, admin]
+
+    # ── User ──────────────────────────────────────────────────────────────────
+    BillingDetails:
+      type: object
+      required: [first_name, street_address, city, phone]
+      properties:
+        first_name:
+          type: string
+        company_name:
+          type: string
+          nullable: true
+        street_address:
+          type: string
+        apartment:
+          type: string
+          nullable: true
+        city:
+          type: string
+        phone:
+          type: string
+          example: "+998901234567"
+        email:
+          type: string
+          format: email
+          nullable: true
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, seller, admin]
+        billing_details:
+          $ref: '#/components/schemas/BillingDetails'
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Product ───────────────────────────────────────────────────────────────
+    ProductVariant:
+      type: object
+      required: [stock]
+      properties:
+        color:
+          type: string
+          example: Red
+        size:
+          type: string
+          example: XL
+        price:
+          type: number
+          format: float
+          description: Overrides base_price if set
+          example: 29.99
+        stock:
+          type: integer
+          example: 50
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [electronics, clothing, books, home, sports, beauty, toys, food,
+                 automotive, garden, health, jewelry, music, office, pets, tools, other]
+        seller_id:
+          type: integer
+        seller:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        images:
+          type: array
+          items:
+            type: string
+          example: ["/uploads/abc123.jpg"]
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductVariant'
+        base_price:
+          type: number
+          format: float
+        discount_percentage:
+          type: number
+          nullable: true
+          example: 15.00
+        discount_expiry:
+          type: string
+          format: date-time
+          nullable: true
+        total_sold:
+          type: integer
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    ProductListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # ── Cart ──────────────────────────────────────────────────────────────────
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        variant_index:
+          type: integer
+        variant_label:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        unit_price:
+          type: number
+        line_total:
+          type: number
+        product:
+          $ref: '#/components/schemas/Product'
+
+    CartResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        summary:
+          type: object
+          properties:
+            total_items:
+              type: integer
+            total_price:
+              type: number
+
+    # ── Order ──────────────────────────────────────────────────────────────────
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        product_name:
+          type: string
+        variant_label:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+        base_price:
+          type: number
+        discount_percentage:
+          type: number
+          nullable: true
+        unit_price:
+          type: number
+        line_total:
+          type: number
+        seller_id:
+          type: integer
+        seller_name:
+          type: string
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: integer
+        payment_type:
+          type: string
+          enum: [click, payme, card, cash]
+        status:
+          type: string
+          enum: [pending, paid, shipped, delivered, cancelled]
+        subtotal:
+          type: number
+        total_price:
+          type: number
+        billing_snapshot:
+          $ref: '#/components/schemas/BillingDetails'
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        created_at:
+          type: string
+          format: date-time
+
+    CreateOrderRequest:
+      type: object
+      required: [payment_type, billing]
+      properties:
+        payment_type:
+          type: string
+          enum: [click, payme, card, cash]
+        notes:
+          type: string
+          nullable: true
+        billing:
+          $ref: '#/components/schemas/BillingDetails'
+
+    # ── Shared ────────────────────────────────────────────────────────────────
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        total_pages:
+          type: integer
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+# ─── Paths ────────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Creates account and sends 6-digit OTP to email for verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: OTP sent to email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-register:
+    post:
+      tags: [Auth]
+      summary: Verify registration OTP
+      description: Activates the account after confirming the OTP sent during registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '200':
+          description: Account activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid or expired OTP
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login step 1 — verify password
+      description: |
+        Checks email and password. If correct, sends a 6-digit OTP to email.
+        Proceed to `/auth/verify-login` with the OTP to receive tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: OTP sent to email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Invalid credentials
+
+  /auth/verify-login:
+    post:
+      tags: [Auth]
+      summary: Login step 2 — verify OTP and receive tokens
+      description: |
+        Verifies the OTP sent after password check. Returns access token (15 min),
+        refresh token (60 days), and sets refresh token as httpOnly cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '200':
+          description: Tokens issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokensResponse'
+        '400':
+          description: Invalid or expired OTP
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: OTP sent (always returns same message to prevent user enumeration)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          description: Invalid or expired OTP
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: |
+        Accepts refresh token from request body, `x-refresh-token` header, or httpOnly cookie.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (revoke refresh token)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+        '401':
+          description: Unauthorized
+
+  # ── Users ───────────────────────────────────────────────────────────────────
+  /users/profile:
+    get:
+      tags: [Users]
+      summary: Get own profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    put:
+      tags: [Users]
+      summary: Update own profile (name or password)
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                password:
+                  type: string
+                  minLength: 6
+      responses:
+        '200':
+          description: Updated profile
+
+  /users/billing:
+    put:
+      tags: [Users]
+      summary: Update billing details
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingDetails'
+      responses:
+        '200':
+          description: Billing updated
+
+  /users/upgrade-to-seller:
+    post:
+      tags: [Users]
+      summary: Upgrade own account to seller
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Upgraded to seller
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List all users (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated user list
+        '403':
+          description: Admin access required
+
+  /users/{id}/role:
+    patch:
+      tags: [Users]
+      summary: Set user role (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [user, seller, admin]
+      responses:
+        '200':
+          description: Role updated
+        '403':
+          description: Admin access required
+
+  # ── Products ─────────────────────────────────────────────────────────────────
+  /products:
+    get:
+      tags: [Products]
+      summary: Get products (paginated, filterable)
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: min_price
+          schema:
+            type: number
+        - in: query
+          name: max_price
+          schema:
+            type: number
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [price_asc, price_desc, newest, most_sold]
+            default: newest
+      responses:
+        '200':
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+
+    post:
+      tags: [Products]
+      summary: Create product (seller or admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, description, category, base_price, variants]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                category:
+                  type: string
+                base_price:
+                  type: number
+                discount_percentage:
+                  type: number
+                  nullable: true
+                discount_expiry:
+                  type: string
+                  format: date-time
+                  nullable: true
+                variants:
+                  type: string
+                  description: JSON string of variant array
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          description: Only sellers or admins can create products
+
+  /products/most-sold:
+    get:
+      tags: [Products]
+      summary: Get most sold products
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of most sold products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+  /products/discounted:
+    get:
+      tags: [Products]
+      summary: Get discounted products (active discounts only)
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated discounted products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Get single product + related products
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Product detail with related items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product:
+                    $ref: '#/components/schemas/Product'
+                  related:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+
+    put:
+      tags: [Products]
+      summary: Update product (seller owner or admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                category:
+                  type: string
+                base_price:
+                  type: number
+                discount_percentage:
+                  type: number
+                  nullable: true
+                discount_expiry:
+                  type: string
+                  format: date-time
+                  nullable: true
+                variants:
+                  type: string
+                  description: JSON string of variant array
+                is_active:
+                  type: boolean
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '200':
+          description: Product updated
+        '403':
+          description: Forbidden
+        '404':
+          description: Product not found
+
+    delete:
+      tags: [Products]
+      summary: Soft-delete product (seller owner or admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Product deleted
+        '403':
+          description: Forbidden
+
+  # ── Cart ──────────────────────────────────────────────────────────────────────
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Get current user's cart with totals
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Cart contents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponse'
+
+    post:
+      tags: [Cart]
+      summary: Add item to cart (merges quantity if already exists)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties:
+                product_id:
+                  type: integer
+                variant_index:
+                  type: integer
+                  default: 0
+                quantity:
+                  type: integer
+                  default: 1
+      responses:
+        '201':
+          description: Item added / quantity merged
+
+  /cart/clear:
+    delete:
+      tags: [Cart]
+      summary: Clear entire cart
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Cart cleared
+
+  /cart/{id}:
+    put:
+      tags: [Cart]
+      summary: Update cart item quantity
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Quantity updated
+
+    delete:
+      tags: [Cart]
+      summary: Remove single item from cart
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item removed
+
+  # ── Wishlist ──────────────────────────────────────────────────────────────────
+  /wishlist:
+    get:
+      tags: [Wishlist]
+      summary: Get user's wishlist
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Wishlist items
+
+    post:
+      tags: [Wishlist]
+      summary: Toggle product in wishlist (add if not present, remove if present)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties:
+                product_id:
+                  type: integer
+      responses:
+        '200':
+          description: Added or removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action:
+                    type: string
+                    enum: [added, removed]
+                  message:
+                    type: string
+
+  /wishlist/move-to-cart/{productId}:
+    post:
+      tags: [Wishlist]
+      summary: Move wishlist item to cart
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: variant_index
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Moved to cart
+
+  # ── Orders ────────────────────────────────────────────────────────────────────
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place order from cart
+      description: |
+        Creates an order from all current cart items. Decrements stock,
+        saves billing snapshot, clears cart, and auto-saves billing to profile
+        if not already set.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Cart empty or stock issue
+
+    get:
+      tags: [Orders]
+      summary: Get my orders
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, paid, shipped, delivered, cancelled]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated orders
+
+  /orders/all:
+    get:
+      tags: [Orders]
+      summary: Get all orders (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, paid, shipped, delivered, cancelled]
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: All orders with user info
+        '403':
+          description: Admin access required
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get single order (own order or admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Order not found
+
+  /orders/{id}/status:
+    patch:
+      tags: [Orders]
+      summary: Update order status
+      description: |
+        Users can only cancel their own pending orders.
+        Admins can set any status on any order.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, paid, shipped, delivered, cancelled]
+      responses:
+        '200':
+          description: Status updated
+        '403':
+          description: Forbidden
+        '404':
+          description: Order not found
